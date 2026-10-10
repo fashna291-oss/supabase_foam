@@ -1,4 +1,11 @@
 
+const {createClient} = supabase;
+
+const supabaseURL = 'https://ozbtwjgfboqlyqirqzng.supabase.co';
+const supabaseKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96YnR3amdmYm9xbHlxaXJxem5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MjY5MTAsImV4cCI6MjEwNzIwMjkxMH0.KjuDSwLug_RAzb3bfNPwMRrKUQmjnC6UutyQy3OFn6o';
+
+const supabaseClient = createClient(supabaseURL, supabaseKEY)
+
 const form = document.getElementById("studentForm");
 
 const nameInput = document.getElementById("name");
@@ -9,41 +16,74 @@ const submitBtn = document.getElementById("submitBtn");
 const studentList = document.getElementById("studentList");
 
 let students = [];
-let editIndex = -1;
+let editId = null;
 
-form.addEventListener("submit", function(event) {
+form.addEventListener("submit", async function(event) {
     event.preventDefault();
 
     const student = {
-        name: nameInput.value,
-        email: emailInput.value,
-        course: courseInput.value
+        name: nameInput.value.trim(),
+        email: emailInput.value.trim(),
+        course: courseInput.value.trim()
     };
 
-    if (editIndex === -1) {
-        students.push(student);
-    } else {
-        students[editIndex] = student;
-        editIndex = -1;
-        submitBtn.textContent = "Submit";
+    let result;
+
+    if(editId !== null){
+        result = await supabaseClient
+  .from('students')
+  .update(student)
+  .eq('id', editId)
+    } else{
+        result = await supabaseClient
+  .from('students')
+  .insert([student])
+
     }
 
+  if(result.error){
+    console.log(result. error)
+    return;
+  }
+
+    
+
     form.reset();
+    editId = null;
+    submitBtn.textContent = "submit";
+
     showStudents();
 });
 
-function showStudents() {
+
+
+
+ 
+
+async  function showStudents() {
+
+        const { data: students, error } = await supabaseClient
+        .from("students")
+        .select("*")
+        .order("id", { ascending: true });
+
+
+        if(error){
+            alert(error.message)
+            return;
+        }
+
     studentList.innerHTML = "";
 
-    students.forEach(function(student, index) {
+    students.forEach(function(student) {
         const row = document.createElement("tr");
 
         row.innerHTML = `
-            <td></td>
-            <td></td>
-            <td></td>
-            <td><button class="editBtn">Edit</button></td>
-            <td><button class="deleteBtn">Delete</button></td>
+            <td>${student.name}</td>
+            <td>${student.email}</td>
+            <td>${student.course}</td>
+            <td><button class="editBtn">Edit</button>
+            <button class="deleteBtn">Delete</button></td>
         `;
 
         row.cells[0].textContent = student.name;
@@ -55,24 +95,30 @@ function showStudents() {
             emailInput.value = student.email;
             courseInput.value = student.course;
 
-            editIndex = index;
+            editId = student.id;
             submitBtn.textContent = "Update";
         });
 
-        row.querySelector(".deleteBtn").addEventListener("click", function() {
-            students.splice(index, 1);
+        row.querySelector(".deleteBtn").addEventListener("click", async function() {
+            const confirmDelete = confirm("Do you want to delete this student")
+            if(confirmDelete){
+                const {error} = await supabaseClient
+                .from("students")
+                .delete()
+                .eq("id", student.id)
+            
 
-            if (editIndex === index) {
-                editIndex = -1;
-                form.reset();
-                submitBtn.textContent = "Submit";
-            } else if (editIndex > index) {
-                editIndex--;
+            if(error){
+                alert(error.message);
+                return;
             }
 
             showStudents();
+        }
         });
 
         studentList.appendChild(row);
     });
 }
+
+showStudents();
